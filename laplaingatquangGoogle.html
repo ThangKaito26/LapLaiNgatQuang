@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình Quản lý Học Tập Lặp Lại</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .task-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .task-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .modal-backdrop, .confirm-backdrop, .timeline-backdrop {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content, .confirm-content, .timeline-content {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        }
+        .toast {
+            animation: slide-in 0.5s forwards, slide-out 0.5s 4.5s forwards;
+        }
+        .progress-bar-inner {
+            transition: width 0.5s ease-in-out;
+        }
+        @keyframes slide-in {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slide-out {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(100%); opacity: 0; }
+        }
+        #timelineWrapper {
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+        }
+        #timelineWrapper::-webkit-scrollbar {
+            display: none;
+        }
+        .timeline-day-column {
+            flex: 0 0 250px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Login Screen -->
+    <div id="loginContainer" class="flex items-center justify-center h-screen">
+        <div class="text-center p-8 bg-white rounded-xl shadow-2xl max-w-sm mx-auto">
+            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500 mb-2">Lịch Trình Ôn Tập</h1>
+            <p class="text-gray-500 mb-8">Đăng nhập để lưu trữ tiến độ học tập của bạn.</p>
+            <button id="loginBtn" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 font-semibold py-3 px-6 rounded-lg shadow-sm hover:bg-gray-50 transition-all transform hover:scale-105">
+                <svg class="w-6 h-6" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                Đăng nhập với Google
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Container (hidden by default) -->
+    <div id="appContainer" class="container mx-auto p-4 md:p-6 max-w-5xl hidden">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-6 md:mb-8">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">Lịch Trình Ôn Tập</h1>
+                <p class="text-gray-500 mt-2">Học thông minh hơn, không phải chăm chỉ hơn.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                 <div id="userInfo" class="text-right">
+                    <p id="userName" class="font-semibold text-gray-700"></p>
+                    <p id="userEmail" class="text-xs text-gray-500"></p>
+                 </div>
+                 <img id="userAvatar" class="w-12 h-12 rounded-full shadow-md" src="" alt="User Avatar">
+                 <button id="logoutBtn" title="Đăng xuất" class="p-3 rounded-full bg-white shadow-sm hover:bg-red-100 transition text-gray-600 hover:text-red-600">
+                    <i data-lucide="log-out" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <div class="flex flex-col md:flex-row justify-center items-center gap-4 mb-6">
+            <button id="addTaskBtn" class="w-full md:w-auto flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-indigo-700 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                Thêm Chủ Đề Mới
+            </button>
+            <button id="timelineBtn" class="w-full md:w-auto flex items-center justify-center gap-2 bg-white text-indigo-600 border border-indigo-600 font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-indigo-50 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
+                <i data-lucide="calendar-days" class="w-5 h-5"></i>
+                Xem Timeline
+            </button>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="mb-6 flex justify-center border-b border-gray-200">
+            <button data-filter="all" class="filter-btn flex-1 py-3 px-4 text-center font-medium text-indigo-600 border-b-2 border-indigo-600">Tất Cả</button>
+            <button data-filter="today" class="filter-btn flex-1 py-3 px-4 text-center font-medium text-gray-500">Cần Ôn Hôm Nay</button>
+            <button data-filter="upcoming" class="filter-btn flex-1 py-3 px-4 text-center font-medium text-gray-500">Sắp Tới</button>
+            <button data-filter="completed" class="filter-btn flex-1 py-3 px-4 text-center font-medium text-gray-500">Đã Hoàn Thành</button>
+        </div>
+
+        <!-- Task List -->
+        <div id="taskList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"></div>
+        <div id="loadingState" class="text-center py-10 text-gray-500"><p>Đang tải danh sách ôn tập...</p></div>
+        <div id="emptyState" class="text-center py-20 px-6 bg-white rounded-lg shadow-sm hidden">
+             <i data-lucide="folder-open" class="w-16 h-16 mx-auto text-gray-300"></i>
+            <h3 class="mt-4 text-lg font-medium text-gray-700">Chưa có chủ đề nào</h3>
+            <p class="mt-1 text-sm text-gray-500">Nhấn "Thêm Chủ Đề Mới" để bắt đầu kế hoạch học tập của bạn.</p>
+        </div>
+    </div>
+
+    <!-- Modals and other elements remain the same -->
+    <div id="taskModal" class="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0">
+        <div id="modalContent" class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-md p-6 md:p-8 transform scale-95 opacity-0">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-gray-800">Thêm Chủ Đề Mới</h2>
+            <form id="taskForm">
+                <input type="hidden" id="taskId">
+                <div class="mb-4">
+                    <label for="taskName" class="block text-sm font-medium text-gray-700 mb-1">Tên chủ đề</label>
+                    <input type="text" id="taskName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ví dụ: Từ vựng tiếng Anh Unit 5" required>
+                </div>
+                <div class="mb-6">
+                    <label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">Ngày bắt đầu học</label>
+                    <input type="date" id="startDate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button type="button" id="cancelBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">Hủy</button>
+                    <button type="submit" class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">Lưu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="confirmModal" class="confirm-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div id="confirmContent" class="confirm-content bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 transform scale-95 opacity-0">
+            <h3 id="confirmTitle" class="text-lg font-bold text-gray-900">Xác nhận hành động</h3>
+            <p id="confirmMessage" class="text-sm text-gray-600 mt-2 mb-6">Bạn có chắc chắn muốn tiếp tục?</p>
+            <div class="flex justify-end gap-3">
+                <button id="confirmCancelBtn" class="px-5 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition">Hủy</button>
+                <button id="confirmOkBtn" class="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">Xóa</button>
+            </div>
+        </div>
+    </div>
+    <div id="timelineModal" class="timeline-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-40">
+        <div class="timeline-content bg-white rounded-lg shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col p-6 transform scale-95 opacity-0">
+            <div class="flex justify-between items-center mb-4 border-b pb-4">
+                <h2 class="text-2xl font-bold text-gray-800">Dòng Thời Gian Ôn Tập</h2>
+                <div class="flex items-center gap-2">
+                     <button id="timelinePrevBtn" class="p-2 rounded-full hover:bg-gray-200"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                     <button id="timelineNextBtn" class="p-2 rounded-full hover:bg-gray-200"><i data-lucide="arrow-right" class="w-6 h-6"></i></button>
+                     <button id="closeTimelineBtn" class="p-2 rounded-full hover:bg-gray-200"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+            </div>
+            <div id="timelineWrapper" class="flex-grow overflow-x-auto">
+                <div id="timelineContainer" class="flex h-full gap-2"></div>
+            </div>
+        </div>
+    </div>
+    <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-900 text-white py-3 px-5 rounded-lg shadow-xl hidden z-50">
+        <p id="toastMessage"></p>
+    </div>
+
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, doc, onSnapshot, deleteDoc, updateDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Dán thông tin cấu hình Firebase của bạn vào đây
+        const firebaseConfig = {
+            apiKey: "AIzaSyDiXkXsVuE_oFvCRjjx5HF-IRyvE0owEQE",
+            authDomain: "laplaingatquang.firebaseapp.com",
+            projectId: "laplaingatquang",
+            storageBucket: "laplaingatquang.appspot.com",
+            messagingSenderId: "824449193335",
+            appId: "1:824449193335:web:80d2023aaa75dbb530fd72"
+        };
+
+        const appId = 'spaced-repetition-app-vietnamese';
+        
+        let app, auth, db, userId, topicsCollectionRef;
+        let unsubscribe; 
+        let localTopicsCache = [];
+
+        const ui = {
+            loginContainer: document.getElementById('loginContainer'),
+            appContainer: document.getElementById('appContainer'),
+            loginBtn: document.getElementById('loginBtn'),
+            logoutBtn: document.getElementById('logoutBtn'),
+            userInfo: {
+                name: document.getElementById('userName'),
+                email: document.getElementById('userEmail'),
+                avatar: document.getElementById('userAvatar'),
+            },
+            taskList: document.getElementById('taskList'),
+            addTaskBtn: document.getElementById('addTaskBtn'),
+            taskModal: document.getElementById('taskModal'),
+            modalContent: document.getElementById('modalContent'),
+            modalTitle: document.getElementById('modalTitle'),
+            taskForm: document.getElementById('taskForm'),
+            cancelBtn: document.getElementById('cancelBtn'),
+            taskIdInput: document.getElementById('taskId'),
+            taskNameInput: document.getElementById('taskName'),
+            startDateInput: document.getElementById('startDate'),
+            toast: document.getElementById('toast'),
+            toastMessage: document.getElementById('toastMessage'),
+            loadingState: document.getElementById('loadingState'),
+            emptyState: document.getElementById('emptyState'),
+            filterBtns: document.querySelectorAll('.filter-btn'),
+            timelineBtn: document.getElementById('timelineBtn'),
+            timelineModal: {
+                backdrop: document.getElementById('timelineModal'),
+                content: document.querySelector('.timeline-content'),
+                wrapper: document.getElementById('timelineWrapper'),
+                container: document.getElementById('timelineContainer'),
+                closeBtn: document.getElementById('closeTimelineBtn'),
+                prevBtn: document.getElementById('timelinePrevBtn'),
+                nextBtn: document.getElementById('timelineNextBtn'),
+            },
+            confirmModal: {
+                backdrop: document.getElementById('confirmModal'),
+                content: document.getElementById('confirmContent'),
+                title: document.getElementById('confirmTitle'),
+                message: document.getElementById('confirmMessage'),
+                okBtn: document.getElementById('confirmOkBtn'),
+                cancelBtn: document.getElementById('confirmCancelBtn'),
+            }
+        };
+
+        const repetitionIntervals = [1, 3, 7, 15, 30];
+        const getReviewSchedule = (startDateStr) => repetitionIntervals.map(days => {
+            let reviewDate = new Date(startDateStr + 'T00:00:00');
+            reviewDate.setDate(reviewDate.getDate() + days);
+            return reviewDate;
+        });
+        const formatDate = (date) => date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formatDayOfWeek = (date) => date.toLocaleDateString('vi-VN', { weekday: 'short' });
+        const isToday = (date) => new Date().toDateString() === date.toDateString();
+
+        function showToast(message) {
+            ui.toastMessage.textContent = message;
+            ui.toast.classList.remove('hidden');
+            setTimeout(() => ui.toast.classList.add('hidden'), 5000);
+        }
+        
+        function showCustomConfirm({ title, message, onOk }) {
+            ui.confirmModal.title.textContent = title;
+            ui.confirmModal.message.textContent = message;
+            ui.confirmModal.backdrop.classList.remove('hidden');
+            setTimeout(() => {
+                ui.confirmModal.backdrop.classList.remove('opacity-0');
+                ui.confirmModal.content.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+            const hide = () => {
+                ui.confirmModal.backdrop.classList.add('opacity-0');
+                ui.confirmModal.content.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => ui.confirmModal.backdrop.classList.add('hidden'), 300);
+            };
+            const okListener = () => { onOk(); hide(); };
+            const cancelListener = () => hide();
+            ui.confirmModal.okBtn.addEventListener('click', okListener, { once: true });
+            ui.confirmModal.cancelBtn.addEventListener('click', cancelListener, { once: true });
+        }
+
+        function renderTasks(filter = 'all') {
+            ui.loadingState.style.display = 'none';
+            let filteredTopics = localTopicsCache;
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            if (filter === 'today') {
+                filteredTopics = localTopicsCache.filter(task => getNextReviewInfo(task) && isToday(getNextReviewInfo(task).date));
+            } else if (filter === 'upcoming') {
+                filteredTopics = localTopicsCache.filter(task => {
+                    const nextReview = getNextReviewInfo(task);
+                    return nextReview && !isToday(nextReview.date) && nextReview.date > now;
+                });
+            } else if (filter === 'completed') {
+                filteredTopics = localTopicsCache.filter(task => !getNextReviewInfo(task));
+            }
+
+            ui.taskList.innerHTML = '';
+            if (filteredTopics.length === 0 && localTopicsCache.length > 0) {
+                ui.emptyState.classList.remove('hidden');
+                ui.emptyState.querySelector('h3').textContent = `Không có chủ đề nào trong mục này`;
+            } else if (localTopicsCache.length === 0) {
+                 ui.emptyState.classList.remove('hidden');
+                 ui.emptyState.querySelector('h3').textContent = `Chưa có chủ đề nào`;
+            } else {
+                ui.emptyState.classList.add('hidden');
+            }
+
+            filteredTopics.sort((a, b) => {
+                const nextA = getNextReviewInfo(a)?.date || new Date('9999-12-31');
+                const nextB = getNextReviewInfo(b)?.date || new Date('9999-12-31');
+                return nextA - nextB;
+            });
+
+            filteredTopics.forEach(task => ui.taskList.appendChild(createTaskCard(task)));
+            lucide.createIcons();
+        }
+
+        function getNextReviewInfo(task) {
+            const schedule = getReviewSchedule(task.startDate);
+            const reviewsCompleted = task.reviewsCompleted || 0;
+            if (reviewsCompleted >= schedule.length) return null;
+            return { date: schedule[reviewsCompleted], index: reviewsCompleted };
+        }
+        
+        function getLastReviewInfo(task) {
+            const schedule = getReviewSchedule(task.startDate);
+            const reviewsCompleted = task.reviewsCompleted || 0;
+            const lastReviewIndex = reviewsCompleted - 1;
+            if (lastReviewIndex < 0) return null;
+            return { date: schedule[lastReviewIndex], index: lastReviewIndex };
+        }
+
+        function createTaskCard(task) {
+            const card = document.createElement('div');
+            card.className = 'task-card bg-white rounded-lg shadow-md p-5 flex flex-col border-l-4';
+            card.dataset.id = task.id;
+
+            const reviewsCompleted = task.reviewsCompleted || 0;
+            const totalReviews = repetitionIntervals.length;
+            const progressPercent = totalReviews > 0 ? (reviewsCompleted / totalReviews) * 100 : 0;
+            const nextReview = getNextReviewInfo(task);
+            const lastReview = getLastReviewInfo(task);
+            let statusText, statusColor, borderColor, actionButton = '';
+
+            if (nextReview) {
+                if (isToday(nextReview.date)) {
+                    statusText = `Ôn tập hôm nay! (Lần ${nextReview.index + 1})`;
+                    statusColor = 'text-red-500';
+                    borderColor = 'border-red-500';
+                    actionButton = `<button class="mark-done-btn w-full mt-4 bg-green-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-600 transition flex items-center justify-center gap-2"><i data-lucide="check-circle" class="w-5 h-5"></i> Đã ôn xong</button>`;
+                } else {
+                    statusText = `Lần ôn tiếp theo: ${formatDate(nextReview.date)}`;
+                    statusColor = 'text-blue-500';
+                    borderColor = 'border-blue-500';
+                }
+            } else {
+                statusText = 'Đã hoàn thành tất cả các lần ôn!';
+                statusColor = 'text-green-500';
+                borderColor = 'border-green-500';
+            }
+            if(lastReview && isToday(lastReview.date)){
+                 actionButton = `<button class="undo-btn w-full mt-4 bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition flex items-center justify-center gap-2"><i data-lucide="rotate-ccw" class="w-5 h-5"></i> Hoàn tác</button>`;
+            }
+            card.classList.add(borderColor);
+            card.innerHTML = `
+                <div class="flex-grow">
+                    <h3 class="font-bold text-lg mb-2 text-gray-800">${task.name}</h3>
+                    <p class="text-sm text-gray-500 mb-3">Bắt đầu: ${formatDate(new Date(task.startDate + 'T00:00:00'))}</p>
+                    <div class="font-semibold ${statusColor} text-sm mb-4">${statusText}</div>
+                    <div class="text-xs text-gray-600 mb-1">Tiến độ: ${reviewsCompleted}/${totalReviews} lần</div>
+                    <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div class="progress-bar-inner bg-gradient-to-r ${nextReview ? 'from-blue-400 to-teal-400' : 'from-green-400 to-emerald-500'}" style="width: ${progressPercent}%"></div>
+                    </div>
+                </div>
+                ${actionButton}
+                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-end gap-2">
+                    <button class="edit-btn p-2 text-gray-400 hover:text-indigo-600 transition-colors"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                    <button class="delete-btn p-2 text-gray-400 hover:text-red-600 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>
+            `;
+            card.querySelector('.delete-btn')?.addEventListener('click', e => { e.stopPropagation(); showCustomConfirm({ title: 'Xác nhận xóa', message: `Bạn có chắc chắn muốn xóa chủ đề "${task.name}"?`, onOk: () => deleteTask(task.id) }); });
+            card.querySelector('.edit-btn')?.addEventListener('click', e => { e.stopPropagation(); openModal(task); });
+            card.querySelector('.mark-done-btn')?.addEventListener('click', e => { e.stopPropagation(); markTaskAsDone(task.id, reviewsCompleted); });
+            card.querySelector('.undo-btn')?.addEventListener('click', e => { e.stopPropagation(); undoLastReview(task.id, reviewsCompleted); });
+            return card;
+        }
+
+        function openModal(task = null) {
+            ui.taskForm.reset();
+            if (task) {
+                ui.modalTitle.textContent = 'Chỉnh Sửa Chủ Đề';
+                ui.taskIdInput.value = task.id;
+                ui.taskNameInput.value = task.name;
+                ui.startDateInput.value = task.startDate;
+            } else {
+                ui.modalTitle.textContent = 'Thêm Chủ Đề Mới';
+                ui.taskIdInput.value = '';
+                ui.startDateInput.value = new Date().toISOString().split('T')[0];
+            }
+            ui.taskModal.classList.remove('hidden');
+            setTimeout(() => {
+                ui.taskModal.classList.remove('opacity-0');
+                ui.modalContent.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeModal() {
+            ui.taskModal.classList.add('opacity-0');
+            ui.modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => ui.taskModal.classList.add('hidden'), 300);
+        }
+
+        async function saveTask(e) {
+            e.preventDefault();
+            const id = ui.taskIdInput.value;
+            const name = ui.taskNameInput.value.trim();
+            const startDate = ui.startDateInput.value;
+            if (!name || !startDate) return showToast("Vui lòng điền đầy đủ thông tin.");
+            try {
+                if (id) {
+                    await updateDoc(doc(db, topicsCollectionRef.path, id), { name, startDate });
+                    showToast('Cập nhật chủ đề thành công!');
+                } else {
+                    // *** FIX: Add ownerId to the new document ***
+                    await addDoc(topicsCollectionRef, { name, startDate, reviewsCompleted: 0, ownerId: userId });
+                    showToast('Thêm chủ đề mới thành công!');
+                }
+                closeModal();
+            } catch (error) { console.error("Error saving task: ", error); showToast(`Lỗi: ${error.message}`); }
+        }
+
+        async function deleteTask(id) {
+            try {
+                await deleteDoc(doc(db, topicsCollectionRef.path, id));
+                showToast('Đã xóa chủ đề.');
+            } catch (error) { console.error("Error deleting task: ", error); showToast(`Lỗi khi xóa: ${error.message}`); }
+        }
+        
+        async function markTaskAsDone(id, currentCompleted) {
+            try {
+                await updateDoc(doc(db, topicsCollectionRef.path, id), { reviewsCompleted: currentCompleted + 1 });
+                showToast('Tuyệt vời! Đã hoàn thành lần ôn tập này.');
+            } catch (error) { console.error("Error marking task as done: ", error); showToast(`Lỗi: ${error.message}`); }
+        }
+        
+        async function undoLastReview(id, currentCompleted) {
+            try {
+                await updateDoc(doc(db, topicsCollectionRef.path, id), { reviewsCompleted: currentCompleted - 1 });
+                showToast('Đã hoàn tác thành công.');
+            } catch (error) { console.error("Error undoing review: ", error); showToast(`Lỗi: ${error.message}`); }
+        }
+
+        function renderTimeline() {
+            const eventsByDate = {};
+            localTopicsCache.forEach(task => {
+                getReviewSchedule(task.startDate).forEach((date, index) => {
+                    const dateString = date.toISOString().split('T')[0];
+                    if (!eventsByDate[dateString]) eventsByDate[dateString] = [];
+                    eventsByDate[dateString].push({ name: task.name, completed: (task.reviewsCompleted || 0) > index });
+                });
+            });
+            const sortedDates = Object.keys(eventsByDate).sort();
+            const container = ui.timelineModal.container;
+            container.innerHTML = '';
+            if (sortedDates.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 w-full mt-8">Không có sự kiện nào trong lịch trình.</p>';
+            } else {
+                sortedDates.forEach(dateString => {
+                    const date = new Date(dateString + 'T00:00:00');
+                    const isCurrentDay = isToday(date);
+                    const column = document.createElement('div');
+                    column.className = `timeline-day-column p-3 rounded-lg border-2 ${isCurrentDay ? 'border-indigo-500 bg-indigo-50' : 'bg-gray-50 border-gray-200'}`;
+                    column.dataset.date = dateString;
+                    const itemsHtml = eventsByDate[dateString].map(item => `<div class="flex items-start text-sm p-2 rounded-md ${item.completed ? 'text-gray-400 bg-gray-100' : 'text-gray-700 bg-white shadow-sm'}"><i data-lucide="${item.completed ? 'check-square' : 'square'}" class="w-4 h-4 mr-2 mt-0.5 flex-shrink-0"></i><span>${item.name}</span></div>`).join('');
+                    column.innerHTML = `<div class="text-center mb-3"><p class="font-bold ${isCurrentDay ? 'text-indigo-600' : 'text-gray-800'}">${formatDayOfWeek(date)}</p><p class="text-xs text-gray-500">${date.getDate()}/${date.getMonth() + 1}</p></div><div class="space-y-2">${itemsHtml}</div>`;
+                    container.appendChild(column);
+                });
+            }
+            lucide.createIcons();
+            ui.timelineModal.backdrop.classList.remove('hidden');
+            setTimeout(() => {
+                ui.timelineModal.backdrop.classList.remove('opacity-0');
+                ui.timelineModal.content.classList.remove('scale-95', 'opacity-0');
+                const todayColumn = container.querySelector(`[data-date="${new Date().toISOString().split('T')[0]}"]`);
+                if (todayColumn) todayColumn.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+            }, 10);
+        }
+
+        function closeTimelineModal() {
+            ui.timelineModal.backdrop.classList.add('opacity-0');
+            ui.timelineModal.content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => ui.timelineModal.backdrop.classList.add('hidden'), 300);
+        }
+
+        async function signInWithGoogle() {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Lỗi khi đăng nhập với Google:", error);
+                showToast("Đăng nhập thất bại. Vui lòng thử lại.");
+            }
+        }
+
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Lỗi khi đăng xuất:", error);
+                showToast("Đăng xuất thất bại.");
+            }
+        }
+
+        function setupEventListeners() {
+            ui.loginBtn.addEventListener('click', signInWithGoogle);
+            ui.logoutBtn.addEventListener('click', signOutUser);
+            ui.addTaskBtn.addEventListener('click', () => openModal());
+            ui.cancelBtn.addEventListener('click', closeModal);
+            ui.taskModal.addEventListener('click', e => e.target === ui.taskModal && closeModal());
+            ui.taskForm.addEventListener('submit', saveTask);
+            ui.timelineBtn.addEventListener('click', renderTimeline);
+            ui.timelineModal.closeBtn.addEventListener('click', closeTimelineModal);
+            ui.timelineModal.backdrop.addEventListener('click', e => e.target === ui.timelineModal.backdrop && closeTimelineModal());
+            ui.timelineModal.prevBtn.addEventListener('click', () => { ui.timelineModal.wrapper.scrollBy(-300, 0); });
+            ui.timelineModal.nextBtn.addEventListener('click', () => { ui.timelineModal.wrapper.scrollBy(300, 0); });
+            ui.filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    ui.filterBtns.forEach(b => {
+                        b.classList.remove('text-indigo-600', 'border-indigo-600');
+                        b.classList.add('text-gray-500');
+                    });
+                    btn.classList.add('text-indigo-600', 'border-indigo-600');
+                    btn.classList.remove('text-gray-500');
+                    renderTasks(btn.dataset.filter);
+                });
+            });
+        }
+
+        async function main() {
+            if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith("AIza...")) {
+                document.body.innerHTML = '<div class="text-center p-8 text-red-500 font-bold">Lỗi: Vui lòng cung cấp thông tin cấu hình Firebase hợp lệ trong tệp HTML.</div>';
+                return;
+            }
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await setPersistence(auth, browserLocalPersistence);
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+                document.body.innerHTML = '<div class="text-center p-8 text-red-500 font-bold">Không thể kết nối tới cơ sở dữ liệu. Vui lòng kiểm tra lại thông tin cấu hình.</div>';
+                return;
+            }
+
+            setupEventListeners();
+            lucide.createIcons();
+
+            onAuthStateChanged(auth, user => {
+                if (user) { // User is signed in
+                    console.log("DEBUG: User signed in:", user.uid);
+                    ui.loginContainer.classList.add('hidden');
+                    ui.appContainer.classList.remove('hidden');
+                    
+                    userId = user.uid;
+                    ui.userInfo.name.textContent = user.displayName;
+                    ui.userInfo.email.textContent = user.email;
+                    ui.userInfo.avatar.src = user.photoURL || 'https://placehold.co/48x48/E0E7FF/4F46E5?text=A';
+                    
+                    const userTopicsPath = `artifacts/${appId}/users/${userId}/topics`;
+                    console.log("DEBUG: Listening to Firestore path:", userTopicsPath);
+                    topicsCollectionRef = collection(db, userTopicsPath);
+                    
+                    if (unsubscribe) unsubscribe(); 
+                    
+                    unsubscribe = onSnapshot(query(topicsCollectionRef), (snapshot) => {
+                        console.log(`DEBUG: Snapshot received with ${snapshot.size} documents.`);
+                        if (snapshot.empty) {
+                            console.log("DEBUG: Snapshot is empty. No topics found at the path.");
+                        }
+                        snapshot.forEach(doc => {
+                            console.log("DEBUG:  - Doc ID:", doc.id, "Data:", doc.data());
+                        });
+
+                        localTopicsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        const currentFilter = document.querySelector('.filter-btn.text-indigo-600').dataset.filter;
+                        renderTasks(currentFilter);
+                    }, (error) => {
+                        console.error("Firestore snapshot error:", error);
+                        ui.loadingState.innerText = "Lỗi khi tải dữ liệu. Kiểm tra console (F12) để biết chi tiết.";
+                    });
+
+                } else { // User is signed out
+                    console.log("DEBUG: User signed out.");
+                    ui.appContainer.classList.add('hidden');
+                    ui.loginContainer.classList.remove('hidden');
+                    
+                    if (unsubscribe) unsubscribe();
+                    
+                    localTopicsCache = [];
+                    ui.taskList.innerHTML = '';
+                    ui.emptyState.classList.add('hidden');
+                    ui.loadingState.classList.remove('hidden');
+                }
+            });
+        }
+
+        main();
+    </script>
+    
+</body>
+</html>
